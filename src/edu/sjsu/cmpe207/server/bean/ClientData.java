@@ -1,15 +1,20 @@
 package edu.sjsu.cmpe207.server.bean;
 
 public class ClientData {
+	private String input;
 	private String userId;
 	private int operationId;
 	private String fileVersion;
 
 	public ClientData() {
-
+		
 	}
 
-	public ClientData(String identifier) {
+	public String getUserId() {
+		return userId;
+	}
+	
+	public void setInput(String identifier) {
 		this.operationId = Integer.parseInt(identifier.substring(0, 1));
 		this.userId = identifier.substring(1, 11);
 		this.fileVersion = identifier.substring(11);
@@ -18,11 +23,6 @@ public class ClientData {
 		System.out.println("user = "+userId);
 		System.out.println("file ver = "+fileVersion);
 	}
-
-	public String getUserId() {
-		return userId;
-	}
-
 	/*
 	 * public void setUserId(String userId) { this.userId = userId; }
 	 */

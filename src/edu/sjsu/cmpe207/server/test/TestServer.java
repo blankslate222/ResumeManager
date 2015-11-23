@@ -9,7 +9,7 @@ public class TestServer {
 		char c = '1';
 		System.out.println( c - '0');
 		ProtocolService ps = new ProtocolService();
-		System.out.println(ps.processClientRequest("100093100281"));
+		//System.out.println(ps.processClientRequest("100093100281"));
 	}
 
 }

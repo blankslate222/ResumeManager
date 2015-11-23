@@ -5,8 +5,6 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.util.Properties;
 
-import edu.sjsu.cmpe207.server.bean.DbConfig;
-
 public class DbConfigManager {
 	
 	public static DbConfig getDbConfig() {

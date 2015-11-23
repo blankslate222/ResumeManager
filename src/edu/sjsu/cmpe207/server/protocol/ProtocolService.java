@@ -4,9 +4,9 @@ import edu.sjsu.cmpe207.server.bean.ClientData;
 
 public class ProtocolService {
 
-	public EnumResponse processClientRequest(String input) {
+	public EnumResponse processClientRequest(String input, ClientData clientRequest) {
 		EnumResponse response = EnumResponse.USAGE;
-		System.out.println("processing line - " + input + "\nProcessing...");
+		// System.out.println("processing line - " + input + "\nProcessing...");
 		if (input.length() != 12) {
 			return getResponseType(EnumRequest.values()[3]);
 		}
@@ -15,15 +15,15 @@ public class ProtocolService {
 				return getResponseType(EnumRequest.values()[3]);
 			}
 		}
-		ClientData clientRequest = new ClientData(input);
-		System.out.println("operation requested = "+clientRequest.getOperationId());
+		clientRequest.setInput(input);
+		// System.out.println("operation requested = "+clientRequest.getOperationId());
 		response = getResponseType(EnumRequest.values()[clientRequest
 				.getOperationId()]);
 		return response;
 	}
 
 	private EnumResponse getResponseType(EnumRequest requestType) {
-		System.out.println("Received request of type = " + requestType);
+		// System.out.println("Received request of type = " + requestType);
 		EnumResponse responseType = EnumResponse.USAGE;
 		switch (requestType) {
 		case INITIATE:

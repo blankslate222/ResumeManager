@@ -1,4 +1,4 @@
-package edu.sjsu.cmpe207.server.bean;
+package edu.sjsu.cmpe207.server.connection;
 
 public class DbConfig {
 	private String dbDriver;

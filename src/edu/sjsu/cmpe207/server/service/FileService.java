@@ -1,11 +1,17 @@
 package edu.sjsu.cmpe207.server.service;
 
 import java.io.BufferedReader;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.io.OutputStream;
 import java.io.PrintWriter;
 import java.net.Socket;
 
+import edu.sjsu.cmpe207.server.bean.ClientData;
 import edu.sjsu.cmpe207.server.protocol.EnumResponse;
 import edu.sjsu.cmpe207.server.protocol.ProtocolService;
 
@@ -40,12 +46,15 @@ public class FileService {
 	}
 
 	private void closeSocket() throws IOException {
+		clientSocket.shutdownInput();
+		clientSocket.shutdownOutput();
 		clientSocket.close();
 	}
 
 	public void handleClientRequest() {
 
 		ProtocolService protocol = null;
+		ClientData clientData = null;
 		String inputLine = "";
 		EnumResponse resp = null;
 		try {
@@ -59,27 +68,31 @@ public class FileService {
 				// logic to process input request
 				// then call recv or send file
 				if ((inputLine = in.readLine()) != null) {
-					System.out.println(inputLine);
+					// System.out.println(inputLine);
 					if (checkByeFromClient(inputLine)) {
 						closeSocket();
 					}
-
-					resp = protocol.processClientRequest(inputLine);
-					System.out.println("response type = " + resp);
+					clientData = new ClientData();
+					resp = protocol.processClientRequest(inputLine, clientData);
+					// System.out.println("response type = " + resp);
 					switch (resp) {
 					case ACKNOWLEDGE:
 						acknowledgeConnectionRequest();
 						break;
 					case READ:
-						receiveFile();
+						receiveFile(clientData);
+						signalSocketClose();
 						break;
 					case USAGE:
 						sendUsage();
+						signalSocketClose();
 						break;
 					case WRITE:
-						sendFile();
+						sendFile(clientData);
+						signalSocketClose();
 						break;
 					default:
+						signalSocketClose();
 						break;
 					}
 				}
@@ -87,15 +100,13 @@ public class FileService {
 					break;
 				}
 			}
-			clientSocket.shutdownInput();
-			clientSocket.shutdownOutput();
+			// clientSocket.shutdownInput();
+			// clientSocket.shutdownOutput();
 		} catch (IOException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
 		} finally {
 			try {
-				clientSocket.shutdownInput();
-				clientSocket.shutdownOutput();
 				closeSocket();
 			} catch (IOException e) {
 				// TODO Auto-generated catch block
@@ -122,26 +133,112 @@ public class FileService {
 		usage += "[path] - path/to/file/fileName - optional\n";
 		usage += "when uploading - specify path to target file\n";
 		usage += "when downloading - specify path to download location \n";
-		out.println(usage);
-		out.println("bye");
-	}
-
-	private void receiveFile() throws IOException {
-		System.out.println("receiving file");
-		String line = null;
-		while ((line = in.readLine()) != null) {
-			if (checkByeFromClient(line)) {
-				closeSocket();
-			}
+		try {
+			out.println(usage);
+		} finally {
 			out.println("bye");
-			signalSocketClose();
-			closeSocket();
-			break;
 		}
 	}
 
-	private void sendFile() throws IOException {
-		out.println("bye");
+	private String getFilePath(ClientData clientData) {
+		String separator = File.separator;
+		StringBuilder sb = new StringBuilder();
+		sb.append(System.getProperty("user.home"));
+		sb.append(separator);
+		sb.append(clientData.getUserId());
+		sb.append(separator);
+		sb.append(clientData.getFileVersion());
+		String filePath = sb.toString();
+		return filePath;
+	}
+
+	private void receiveFile(ClientData clientData) throws IOException {
+
+		String path = "";
+		File directory = null;
+		File prevDir = null;
+		File destinationFile = null;
+		byte[] buf = null;
+		InputStream in = null;
+		FileOutputStream out = null;
+
+		System.out.println("receiving file...");
+		acknowledgeConnectionRequest();
+		path = getFilePath(clientData);
+		System.out.println("saving in path = " + path);
+		String prevPath = "";
+		for (int i = path.length() - 1; i >= 0; i--) {
+			if (path.charAt(i) == File.separatorChar) {
+				prevPath = path.substring(0, i);
+				break;
+			}
+		}
+		prevDir = new File(prevPath);
+		if (!prevDir.exists()) {
+			prevDir.mkdir();
+		}
+		directory = new File(path);
+		if (!directory.exists()) {
+			directory.mkdir();
+		}
+		destinationFile = new File(path + File.separator
+				+ clientData.getUserId() + ".pdf");
+		if (!destinationFile.exists()) {
+			destinationFile.createNewFile();
+		}
+
+		buf = new byte[8192];
+		int len = 0;
+		in = getClientSocket().getInputStream();
+		out = new FileOutputStream(destinationFile);
+
+		while ((len = in.read(buf)) != -1) {
+			out.write(buf, 0, len);
+		}
+		out.close();
+	}
+
+	private void sendFile(ClientData clientData) throws IOException {
+
+		String path = "";
+		File destinationDir = null;
+		File destinationFile = null;
+		FileInputStream is = null;
+		OutputStream os = null;
+		byte[] buf = null;
+
+		System.out.println("sending file...");
+		acknowledgeConnectionRequest();
+
+		path = getFilePath(clientData);
+		// System.out.println("sending file from path = " + path);
+		destinationDir = new File(path);
+		if (!destinationDir.exists()) {
+			System.out.println("Error: Directory does not exist");
+			return;
+		}
+		if (destinationDir.list().length <= 0) {
+			System.out.println("Error: File does not exist");
+			return;
+		}
+		if (destinationDir.list().length > 1) {
+			System.out.println("Error: Too many files - can send only 1 file");
+			return;
+		}
+		for (File f : destinationDir.listFiles()) {
+			destinationFile = f;
+		}
+		
+		System.out.println("sending file from path = "
+				+ destinationFile.getAbsolutePath());
+		is = new FileInputStream(destinationFile);
+		os = getClientSocket().getOutputStream();
+		buf = new byte[8192];
+		int len = 0;
+		while ((len = is.read(buf)) != -1) {
+			os.write(buf, 0, len);
+		}
+		is.close();
 	}
 
 	private boolean checkByeFromClient(String line) {
