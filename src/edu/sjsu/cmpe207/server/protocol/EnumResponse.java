@@ -1,8 +1,12 @@
 package edu.sjsu.cmpe207.server.protocol;
 
+/**
+ * @author Nikhil
+ *
+ */
 public enum EnumResponse {
-	ACKNOWLEDGE,
-	USAGE,
-	READ,
-	WRITE
+	/*
+	 * Enum constants for different response types
+	 */
+	ACKNOWLEDGE, USAGE, READ, WRITE
 }

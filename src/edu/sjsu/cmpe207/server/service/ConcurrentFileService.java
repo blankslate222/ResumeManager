@@ -3,7 +3,6 @@ package edu.sjsu.cmpe207.server.service;
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileInputStream;
-import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
@@ -19,48 +18,26 @@ import edu.sjsu.cmpe207.server.protocol.ProtocolService;
  * @author Nikhil
  *
  */
-public class FileService {
+public class ConcurrentFileService implements Runnable {
 	/*
-	 * Service class for single-threaded server Mostly same as
-	 * ConcurrentFileService.java
+	 * Service class which contains helper methods and methods which make use of
+	 * the synchronized file IO methods defined in FileAccessControl.java
 	 */
 	private Socket clientSocket;
 	private boolean CLOSE = false;
 	private BufferedReader in;
 	private PrintWriter out;
 
-	public FileService(Socket skt) {
-		this.setClientSocket(skt);
+	public ConcurrentFileService(Socket clientSock) {
+		this.clientSocket = clientSock;
 	}
 
-	public FileService() {
+	public ConcurrentFileService() {
 
 	}
 
-	public Socket getClientSocket() {
-		return clientSocket;
-	}
-
-	public void setClientSocket(Socket clientSocket) {
-		this.clientSocket = clientSocket;
-	}
-
-	private void signalSocketClose() {
-
-		CLOSE = true;
-	}
-
-	private void signalSocketOpen() {
-		CLOSE = false;
-	}
-
-	private void closeSocket() throws IOException {
-		clientSocket.shutdownInput();
-		clientSocket.shutdownOutput();
-		clientSocket.close();
-	}
-
-	public void handleClientRequest() {
+	@Override
+	public void run() {
 
 		ProtocolService protocol = null;
 		ClientData clientData = null;
@@ -78,11 +55,13 @@ public class FileService {
 			while (true) {
 
 				if ((inputLine = in.readLine()) != null) {
+
 					if (checkByeFromClient(inputLine)) {
 						closeSocket();
 					}
 					clientData = new ClientData();
 					resp = protocol.processClientRequest(inputLine, clientData);
+
 					switch (resp) {
 					case ACKNOWLEDGE:
 						acknowledgeConnectionRequest(0l);
@@ -108,7 +87,6 @@ public class FileService {
 					break;
 				}
 			}
-
 		} catch (IOException e) {
 			e.printStackTrace();
 		} finally {
@@ -122,6 +100,21 @@ public class FileService {
 				e.printStackTrace();
 			}
 		}
+	}
+
+	private void signalSocketClose() {
+
+		CLOSE = true;
+	}
+
+	private void signalSocketOpen() {
+		CLOSE = false;
+	}
+
+	private void closeSocket() throws IOException {
+		clientSocket.shutdownInput();
+		clientSocket.shutdownOutput();
+		clientSocket.close();
 	}
 
 	private void acknowledgeConnectionRequest(long l) throws IOException {
@@ -166,22 +159,20 @@ public class FileService {
 	}
 
 	private void receiveFile(ClientData clientData) throws IOException {
-
+		System.out.println("running from thread - "
+				+ Thread.currentThread().getName());
 		int size = 0;
-		int len = 0;
-		long totalRead = 0l;
 		String path = "";
 		File directory = null;
 		File prevDir = null;
 		File destinationFile = null;
-		byte[] buf = null;
 		InputStream in = null;
-		FileOutputStream out = null;
 
 		System.out.println("receiving file...");
 		acknowledgeConnectionRequest(0l);
 		path = getFilePath(clientData);
 
+		System.out.println("saving in path = " + path);
 		String prevPath = "";
 		for (int i = path.length() - 1; i >= 0; i--) {
 			if (path.charAt(i) == File.separatorChar) {
@@ -203,29 +194,18 @@ public class FileService {
 			destinationFile.createNewFile();
 		}
 		size = clientData.getFileSize();
+		in = clientSocket.getInputStream();
 
-		buf = new byte[1024];
-
-		in = getClientSocket().getInputStream();
-		out = new FileOutputStream(destinationFile);
-
-		while (totalRead <= size) {
-			len = in.read(buf);
-			if (len != -1) {
-				out.write(buf, 0, len);
-				out.flush();
-				totalRead += len;
-			}
-
-			if (len == -1 && totalRead == size) {
-				break;
-			}
+		int resp = FileAccessControl.writeToFile(in, destinationFile, size);
+		if (resp < 0) {
+			System.out.println("file not received properly");
+			return;
 		}
-		out.close();
 	}
 
 	private void sendFile(ClientData clientData) throws IOException {
-
+		System.out.println("running from thread - "
+				+ Thread.currentThread().getName());
 		String path = "";
 		File destinationDir = null;
 		File destinationFile = null;
@@ -236,7 +216,6 @@ public class FileService {
 		System.out.println("sending file...");
 
 		path = getFilePath(clientData);
-
 		destinationDir = new File(path);
 		if (!destinationDir.exists()) {
 			System.out.println("Error: Directory does not exist");
@@ -255,12 +234,12 @@ public class FileService {
 		}
 
 		acknowledgeConnectionRequest(destinationFile.length());
-
+		System.out.println("sending file from path = "
+				+ destinationFile.getAbsolutePath());
 		is = new FileInputStream(destinationFile);
 
-		os = getClientSocket().getOutputStream();
-		byte[] fileArray = new byte[(int) destinationFile.length()];
-		is.read(fileArray);
+		os = clientSocket.getOutputStream();
+		byte[] fileArray = FileAccessControl.readFromFile(destinationFile);
 
 		int len = 0;
 		while (len < fileArray.length) {

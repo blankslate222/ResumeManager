@@ -6,7 +6,14 @@ import java.net.Socket;
 
 import edu.sjsu.cmpe207.server.service.FileService;
 
+/**
+ * @author Nikhil
+ *
+ */
 public class FileServer {
+	/*
+	 * Main class of single threaded server
+	 */
 
 	public static void main(String[] args) {
 		FileServer server = new FileServer();
@@ -17,11 +24,10 @@ public class FileServer {
 		ServerSocket server = null;
 		FileService handler = null;
 		Socket skt = null;
-		System.out.println("Server listening on 8888");
 
 		try {
 			server = new ServerSocket(8888);
-
+			System.out.println("Server listening on 8888");
 			while (true) {
 
 				skt = server.accept();
@@ -29,7 +35,6 @@ public class FileServer {
 						+ skt.getInetAddress().getHostAddress());
 				handler = new FileService(skt);
 				handler.handleClientRequest();
-				//skt.close();
 			}
 		} catch (Exception e) {
 			e.printStackTrace();
@@ -37,7 +42,6 @@ public class FileServer {
 			try {
 				server.close();
 			} catch (IOException e) {
-				// TODO Auto-generated catch block
 				e.printStackTrace();
 			}
 		}
